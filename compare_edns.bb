@@ -1,6 +1,6 @@
 #!/usr/bin/env bb
 
-(ns compare-edn
+(ns compare-edns
   (:require
    [lambdaisland.deep-diff2     :as ddiff]
    [clojure.edn                 :as edn]))
@@ -77,13 +77,16 @@
    (config-diffs "config.default.edn" "config.edn")))
 (comment (config-diffs))
 
+(defn print-help []
+  (println "Usage: ./compare_edn.bb <file1.edn> <file2.edn>"))
+
 (defn -main
   [& [config1 config2]]
   (if (and config1 config2)
     (do
       (println "Comparing files"  config1  "and"  config2)
       (config-diffs config1 config2))
-    (config-diffs)))
+    (print-help)))
 
 (when (= *file* (System/getProperty "babashka.file"))
   (apply -main *command-line-args*))
