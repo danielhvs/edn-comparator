@@ -1,6 +1,6 @@
 # edn-comparator
 
-Compara 2 edn files
+Compare 2 edn files
 
 Usage:
 
