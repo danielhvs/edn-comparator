@@ -36,7 +36,8 @@ Results:
 ```bash
 bb compare_edns.bb sample1.edn sample2.edn
 Comparing files sample1.edn and sample2.edn
+```
+
 ```clojure
 {:y #{+"0.:yy" -"0.:k"}, -:z #{}}
-```
 ```
