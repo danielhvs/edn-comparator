@@ -2,8 +2,8 @@
 
 (ns compare-edns
   (:require
-   [lambdaisland.deep-diff2     :as ddiff]
-   [clojure.edn                 :as edn]))
+   [clojure.edn                 :as edn]
+   [lambdaisland.deep-diff2     :as ddiff]))
 
 (defn read-config
   "From an edn file to clj data"
@@ -12,60 +12,107 @@
       slurp
       edn/read-string))
 
-(defn- update-map-keys-with-index [index m]
-  (update-keys m
-               #(keyword (str index "." (name %)))))
+(defn vector->map-coll [v]
+  (map-indexed
+   (fn [index item]
+     {index item})
+   v))
 
-(defn deep-merge-maps
-  "Builds a map from a coll of maps (arbitrary deepness)"
-  [coll]
-  (reduce
-   (fn [acc item]
-     (cond (map? item)
-           (merge acc item)
-           :else
-           (merge acc (deep-merge-maps item))))
-   {}
-   coll))
-(comment (deep-merge-maps [{:__vec-0.0.x 2} [[{:__vec-0.2.x 3}]] [{:.1 2} [[[{:__vec-0.4.innie 42}]]]]]))
-(comment (deep-merge-maps [{:__vec-0.0.x 2}]))
+(defn collect-all-keys
+  "Returns a map with paths to where there are some keys"
+  [v]
+  (let [the-maps (vector->map-coll v)]
+    (reduce
+     (fn [acc entry]
+       (let [the-value (second (first entry))
+             the-key   (ffirst entry)]
+         (cond (map? the-value)
+               (assoc acc the-key the-value)
+               (vector? the-value)
+               (assoc acc the-key (collect-all-keys the-value))
+               :else
+               acc)))
+     {}
+     the-maps)))
+(comment (collect-all-keys  [1 {:x 41 :a 0}
+                             {:x 42}
+                             [{:y 43} [9 8 {:zz 44} 10]]
+                             3]))
 
-(defn normalize-vector
-  "Transforms a vector into a coll of maps whose keys describes the 'locations'"
-  [v index]
-  (map-indexed (fn [the-index the-value]
-                 (cond (map? the-value)
-                       (update-map-keys-with-index (str "__vec-" the-index "." index) the-value)
-                       (vector? the-value)
-                       (normalize-vector the-value (inc index))
-                       :else
-                       {(keyword (str "__plain." index)) the-value}))
-               v))
-(comment (normalize-vector [[{:x 0} 1]] 0))
-;; FIXME the example is buggy so fix the code. It's good enough for me though
-(comment (normalize-vector [{:x [[[{:inner 42}]]]}] 0))
-;; FIXME the example is buggy so fix the code. It's good enough for me though
-(comment (normalize-vector [1 2 3 {:x 42 :y [[[43 {:innie "hi, outie!"}]]]}] 0))
+(defn one-level-map? [m]
+  (and (map? m) (empty? (filter map? (vals m)))))
+(comment
+  (one-level-map? {:x 2 :y 3})
+  (one-level-map? {:x 2 :y 3 :z {:lol 42}}))
+
+(defn compose-keys** [k v]
+  (println "v:" v)
+  (println "k:" k)
+  (let [the-keys (keys v)]
+    (set (map #(str k "." %)
+              (into #{}
+                    (for [k the-keys] (str k)))))))
+(comment (compose-keys** 0 {:yy 42}))
+
+(defn compose-keys* [[k v]]
+  (println "one-level?" v)
+  (cond (one-level-map? v)
+        (compose-keys** k v)
+        (map? v)
+        (into #{} (map compose-keys* (update-keys v #(str k "." %))))
+        :else
+        #{k}))
+(comment
+  (compose-keys* [0 {:a 1 :b 2}])
+  (compose-keys* [0 {1 {:a 2 :b 3}}])
+  (compose-keys* [0 {1 {:a 2 :b 3}
+                     2 {:x 4 :y 5}}])
+  (compose-keys* [0 {1 {:a 2
+                        :b 3
+                        :c {:x 4 :y 5}}}]))
+
+(defn compose-keys
+  "Return a coll of sets"
+  [m]
+  (let [entries (seq m)]
+    (map compose-keys* entries)))
+
+(comment
+  (compose-keys {:x 42})
+  (compose-keys  {:x {:inner 42}
+                  :y 99})
+  (compose-keys {0 {:a 1 :b 2}})
+  (compose-keys {3 {0 {:y 43}}})
+  (compose-keys {1 {:x 41}, 2 {:x 42}, 3 {0 {:y 43}, 1 {2 {:zz 44}}}})
+  (compose-keys (collect-all-keys  [1
+                                    {:x 41}
+                                    {:x 42}
+                                    [{:y 43} [9 8 {:zz 44} 10]]
+                                    3])))
 
 (defn normalize
-  "Main function: normalizes the config map"
+  "Main function: normalizes the config map. Returns a map to a set of keys."
   [m]
   (reduce (fn [acc [k the-value]]
-            (cond (map? the-value)
-                  (merge acc (deep-merge-maps (normalize-vector [{k the-value}] 0)))
-                  (vector? the-value)
-                  (merge acc (deep-merge-maps (normalize-vector the-value 0)))
-                  :else
-                  (assoc acc k the-value)))
+            (assoc acc k
+                   (cond (map? the-value)
+                         (reduce conj (compose-keys the-value))
+                         (vector? the-value)
+                         (reduce conj (compose-keys (collect-all-keys the-value)))
+                         :else
+                         #{})))
           {}
           m))
-(comment (normalize {:x {:inner 42}}))
-(comment (normalize {:x [[[{:inner 42}]]]}))
-;; FIXME buggy. Where is :x?
-(comment (normalize {:x [1 [{:y 0}]]}))
+(comment
+  (normalize {:a 1 :x 42 :y [{:yy 43}]})
+  (normalize {:x {:inner 42}
+              :y 99})
+  (normalize {:x [[[{:inner 42}]]]})
+  (normalize {:x [1 [{:y 0}]]})
+  (normalize {:x 42}))
 
 (defn- select-config-keys [config]
-  (-> config read-config normalize keys set))
+  (-> config read-config normalize))
 
 (defn config-diffs
   "Print the leftover keys from both files"
@@ -74,7 +121,7 @@
                   (select-config-keys config1))
       (ddiff/minimize)
       (ddiff/pretty-print)))
-(comment (config-diffs "config.default.edn" "config.edn"))
+(comment (config-diffs "sample1.edn" "sample2.edn"))
 
 (defn print-help []
   (println "Usage: ./compare_edn.bb <file1.edn> <file2.edn>"))
