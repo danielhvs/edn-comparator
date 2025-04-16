@@ -20,5 +20,5 @@ bb compare_edns.bb sample1.edn sample2.edn
 
 ```bash
 Comparing files sample1.edn and sample2.edn
-#{+:__vec-0.0.yy -:z}
+{:y #{+"0.:yy" -"0.:k"}, -:z #{}}
 ```
