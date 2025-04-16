@@ -70,8 +70,8 @@
 (defn config-diffs
   "Print the leftover keys from both files"
   [config1 config2]
-  (-> (ddiff/diff (select-config-keys config1)
-                  (select-config-keys config2))
+  (-> (ddiff/diff (select-config-keys config2)
+                  (select-config-keys config1))
       (ddiff/minimize)
       (ddiff/pretty-print)))
 (comment (config-diffs "config.default.edn" "config.edn"))
