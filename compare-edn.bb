@@ -1,7 +1,5 @@
 #!/usr/bin/env bb
 
-;; NOTE this file must be self-contained - it will be executed as a standalone script.
-
 (ns compare-edn
   (:require
    [lambdaisland.deep-diff2     :as ddiff]
