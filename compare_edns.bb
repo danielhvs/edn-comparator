@@ -68,14 +68,13 @@
   (-> config read-config normalize keys set))
 
 (defn config-diffs
-  ([config1 config2]
-   (-> (ddiff/diff (select-config-keys config1)
-                   (select-config-keys config2))
-       (ddiff/minimize)
-       (ddiff/pretty-print)))
-  ([]
-   (config-diffs "config.default.edn" "config.edn")))
-(comment (config-diffs))
+  "Print the leftover keys from both files"
+  [config1 config2]
+  (-> (ddiff/diff (select-config-keys config1)
+                  (select-config-keys config2))
+      (ddiff/minimize)
+      (ddiff/pretty-print)))
+(comment (config-diffs "config.default.edn" "config.edn"))
 
 (defn print-help []
   (println "Usage: ./compare_edn.bb <file1.edn> <file2.edn>"))
